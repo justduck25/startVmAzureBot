@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Cache-Control: public, max-age=0, must-revalidate
+Content-Length: 10
+Content-Type: application/json; charset=utf-8
+Date: Fri, 20 Feb 2026 16:14:48 GMT
+Etag: W/"a-mBEJrC7LGkai17jupaLExWpZfTQ"
+Server: Vercel
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Vercel-Cache: MISS
+X-Vercel-Id: hkg1::iad1::6m7tx-1771604088250-cd8a6212aacf
+
+{"type":1}

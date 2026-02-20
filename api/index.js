@@ -1,44 +1,46 @@
 import axios from "axios";
 import { verifyKey } from "discord-interactions";
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
   }
 
-  // Fallback to JSON.stringify if req.body is already parsed by Vercel
-  const rawBody =
-    typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
-
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
 
   if (!process.env.DISCORD_PUBLIC_KEY) {
-    return res
-      .status(500)
-      .send(
-        "Lỗi Server: Thiếu DISCORD_PUBLIC_KEY trong Environment Variables của Vercel.",
-      );
+    return res.status(500).send("Lỗi Server: Thiếu DISCORD_PUBLIC_KEY");
   }
 
-  // Verify Discord Request
-  let isValidRequest = false;
-  try {
-    isValidRequest = verifyKey(
-      rawBody,
-      signature,
-      timestamp,
-      process.env.DISCORD_PUBLIC_KEY,
-    );
-  } catch (err) {
-    return res.status(500).send("Lỗi Xác Thực Vercel: " + err.message);
-  }
+  const rawBody = await new Promise((resolve) => {
+    let raw = "";
+    req.on("data", (chunk) => {
+      raw += chunk;
+    });
+    req.on("end", () => {
+      resolve(raw);
+    });
+  });
+
+  const isValidRequest = verifyKey(
+    rawBody,
+    signature,
+    timestamp,
+    process.env.DISCORD_PUBLIC_KEY,
+  );
 
   if (!isValidRequest) {
     return res.status(401).send("Bad request signature");
   }
 
-  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  const body = JSON.parse(rawBody);
   const { type, data, member, user } = body;
 
   // Discord connection ping
