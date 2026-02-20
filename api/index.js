@@ -1,31 +1,14 @@
 import axios from "axios";
 import { verifyKey } from "discord-interactions";
 
-// Prevent Vercel from parsing the body automatically
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
   }
 
-  // Get raw body
-  const buf = await new Promise((resolve, reject) => {
-    let rawBody = "";
-    req.on("data", (chunk) => {
-      rawBody += chunk;
-    });
-    req.on("end", () => {
-      resolve(rawBody);
-    });
-    req.on("error", (err) => {
-      reject(err);
-    });
-  });
+  // Fallback to JSON.stringify if req.body is already parsed by Vercel
+  const rawBody =
+    typeof req.body === "string" ? req.body : JSON.stringify(req.body || {});
 
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
@@ -42,7 +25,7 @@ export default async function handler(req, res) {
   let isValidRequest = false;
   try {
     isValidRequest = verifyKey(
-      buf,
+      rawBody,
       signature,
       timestamp,
       process.env.DISCORD_PUBLIC_KEY,
@@ -55,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(401).send("Bad request signature");
   }
 
-  const body = JSON.parse(buf);
+  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   const { type, data, member, user } = body;
 
   // Discord connection ping
