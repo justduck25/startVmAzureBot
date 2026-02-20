@@ -1,115 +1,93 @@
 import axios from "axios";
-import { verifyKey } from "discord-interactions";
+import express from "express";
+import { verifyKeyMiddleware } from "discord-interactions";
 
-export const config = {
-  api: {
-    bodyParser: false,
+const app = express();
+
+// Use verifyKeyMiddleware for all requests.
+// This automatically verifies the signature AND parses the body.
+app.post(
+  "/api",
+  verifyKeyMiddleware(process.env.DISCORD_PUBLIC_KEY),
+  async (req, res) => {
+    try {
+      const { type, data, member, user } = req.body;
+
+      // Discord connection ping
+      if (type === 1) {
+        return res.status(200).json({ type: 1 });
+      }
+
+      // Slash commands
+      if (type === 2) {
+        const interactionUser = member ? member.user : user;
+
+        // Security check: Only allow specific user ID if it is set
+        if (
+          process.env.ALLOWED_USER_ID &&
+          interactionUser.id !== process.env.ALLOWED_USER_ID
+        ) {
+          return res.status(200).json({
+            type: 4,
+            data: { content: "❌ Bạn không có quyền sử dụng bot này!" },
+          });
+        }
+
+        if (data.name === "start") {
+          try {
+            await startVM();
+            return res.status(200).json({
+              type: 4,
+              data: { content: "🚀 Yêu cầu BẬT VM đã được gửi..." },
+            });
+          } catch (error) {
+            return res.status(200).json({
+              type: 4,
+              data: { content: `❌ Lỗi khi bật VM: ${error.message}` },
+            });
+          }
+        }
+
+        if (data.name === "stop") {
+          try {
+            await stopVM();
+            return res.status(200).json({
+              type: 4,
+              data: { content: "🛑 Yêu cầu TẮT VM đã được gửi..." },
+            });
+          } catch (error) {
+            return res.status(200).json({
+              type: 4,
+              data: { content: `❌ Lỗi khi tắt VM: ${error.message}` },
+            });
+          }
+        }
+
+        if (data.name === "status") {
+          try {
+            const isRunning = await checkVMStatus();
+            return res.status(200).json({
+              type: 4,
+              data: {
+                content: isRunning ? "🟢 VM ĐANG CHẠY" : "🔴 VM ĐANG TẮT",
+              },
+            });
+          } catch (error) {
+            return res.status(200).json({
+              type: 4,
+              data: {
+                content: `❌ Lỗi khi kiểm tra status VM: ${error.message}`,
+              },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send("Internal Error");
+    }
   },
-};
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).send("Method not allowed");
-  }
-
-  const signature = req.headers["x-signature-ed25519"];
-  const timestamp = req.headers["x-signature-timestamp"];
-
-  if (!process.env.DISCORD_PUBLIC_KEY) {
-    return res.status(500).send("Lỗi Server: Thiếu DISCORD_PUBLIC_KEY");
-  }
-
-  const rawBody = await new Promise((resolve) => {
-    let raw = "";
-    req.on("data", (chunk) => {
-      raw += chunk;
-    });
-    req.on("end", () => {
-      resolve(raw);
-    });
-  });
-
-  const isValidRequest = verifyKey(
-    rawBody,
-    signature,
-    timestamp,
-    process.env.DISCORD_PUBLIC_KEY,
-  );
-
-  if (!isValidRequest) {
-    return res.status(401).send("Bad request signature");
-  }
-
-  const body = JSON.parse(rawBody);
-  const { type, data, member, user } = body;
-
-  // Discord connection ping
-  if (type === 1) {
-    return res.status(200).json({ type: 1 });
-  }
-
-  // Slash commands
-  if (type === 2) {
-    // Basic user extraction (member.user in servers, user in DMs)
-    const interactionUser = member ? member.user : user;
-
-    // Security check: Only allow specific user ID if it is set. If empty, allow everyone.
-    if (
-      process.env.ALLOWED_USER_ID &&
-      interactionUser.id !== process.env.ALLOWED_USER_ID
-    ) {
-      return res.status(200).json({
-        type: 4,
-        data: { content: "❌ Bạn không có quyền sử dụng bot này!" },
-      });
-    }
-
-    if (data.name === "start") {
-      try {
-        await startVM();
-        return res.status(200).json({
-          type: 4,
-          data: { content: "🚀 Yêu cầu BẬT VM đã được gửi..." },
-        });
-      } catch (error) {
-        return res.status(200).json({
-          type: 4,
-          data: { content: `❌ Lỗi khi bật VM: ${error.message}` },
-        });
-      }
-    }
-
-    if (data.name === "stop") {
-      try {
-        await stopVM();
-        return res.status(200).json({
-          type: 4,
-          data: { content: "🛑 Yêu cầu TẮT VM đã được gửi..." },
-        });
-      } catch (error) {
-        return res.status(200).json({
-          type: 4,
-          data: { content: `❌ Lỗi khi tắt VM: ${error.message}` },
-        });
-      }
-    }
-
-    if (data.name === "status") {
-      try {
-        const isRunning = await checkVMStatus();
-        return res.status(200).json({
-          type: 4,
-          data: { content: isRunning ? "🟢 VM ĐANG CHẠY" : "🔴 VM ĐANG TẮT" },
-        });
-      } catch (error) {
-        return res.status(200).json({
-          type: 4,
-          data: { content: `❌ Lỗi khi kiểm tra status VM: ${error.message}` },
-        });
-      }
-    }
-  }
-}
+);
 
 // ============== AZURE LOGIC =================
 async function getAzureToken() {
@@ -152,6 +130,8 @@ async function checkVMStatus() {
 
   const statuses = response.data.statuses;
   const powerState = statuses.find((s) => s.code.startsWith("PowerState/"));
-  // Example of powerState.code: 'PowerState/running' or 'PowerState/deallocated'
   return powerState && powerState.code === "PowerState/running";
 }
+
+// Export the Express app as a Vercel serverless function
+export default app;
