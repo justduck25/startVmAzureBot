@@ -1,0 +1,19 @@
+{
+  "name": "startserverbot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "register": "node register.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "discord-interactions": "^4.4.0",
+    "dotenv": "^17.3.1"
+  }
+}
