@@ -13,11 +13,26 @@ export default async function handler(req, res) {
     return res.status(405).send("Method not allowed");
   }
 
+  // Get raw body
+  const buf = await new Promise((resolve, reject) => {
+    let rawBody = "";
+    req.on("data", (chunk) => {
+      rawBody += chunk;
+    });
+    req.on("end", () => {
+      resolve(rawBody);
+    });
+    req.on("error", (err) => {
+      reject(err);
+    });
+  });
+
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
+
   // Verify Discord Request
   const isValidRequest = verifyKey(
-    rawBody,
+    buf,
     signature,
     timestamp,
     process.env.DISCORD_PUBLIC_KEY,
@@ -27,7 +42,7 @@ export default async function handler(req, res) {
     return res.status(401).send("Bad request signature");
   }
 
-  const body = JSON.parse(rawBody);
+  const body = JSON.parse(buf);
   const { type, data, member, user } = body;
 
   // Discord connection ping
