@@ -30,13 +30,26 @@ export default async function handler(req, res) {
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
 
+  if (!process.env.DISCORD_PUBLIC_KEY) {
+    return res
+      .status(500)
+      .send(
+        "Lỗi Server: Thiếu DISCORD_PUBLIC_KEY trong Environment Variables của Vercel.",
+      );
+  }
+
   // Verify Discord Request
-  const isValidRequest = verifyKey(
-    buf,
-    signature,
-    timestamp,
-    process.env.DISCORD_PUBLIC_KEY,
-  );
+  let isValidRequest = false;
+  try {
+    isValidRequest = verifyKey(
+      buf,
+      signature,
+      timestamp,
+      process.env.DISCORD_PUBLIC_KEY,
+    );
+  } catch (err) {
+    return res.status(500).send("Lỗi Xác Thực Vercel: " + err.message);
+  }
 
   if (!isValidRequest) {
     return res.status(401).send("Bad request signature");
