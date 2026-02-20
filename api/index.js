@@ -15,6 +15,11 @@ export default async function handler(req, res) {
 
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
+  // Verify Discord Request
+  const isValidRequest = verifyKey(
+    rawBody,
+    signature,
+    timestamp,
     process.env.DISCORD_PUBLIC_KEY,
   );
 
