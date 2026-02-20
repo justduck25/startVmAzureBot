@@ -8,15 +8,6 @@ export const config = {
   },
 };
 
-// Helper function to extract raw body manually
-async function getRawBody(req) {
-  let data = "";
-  for await (const chunk of req) {
-    data += chunk;
-  }
-  return data;
-}
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
@@ -24,18 +15,6 @@ export default async function handler(req, res) {
 
   const signature = req.headers["x-signature-ed25519"];
   const timestamp = req.headers["x-signature-timestamp"];
-  let rawBody;
-  try {
-    rawBody = await getRawBody(req);
-  } catch (err) {
-    return res.status(400).send("Bad request body");
-  }
-
-  // Verify Discord Request
-  const isValidRequest = verifyKey(
-    rawBody,
-    signature,
-    timestamp,
     process.env.DISCORD_PUBLIC_KEY,
   );
 
